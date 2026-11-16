@@ -1,0 +1,27 @@
+name: Publish to NuGet
+
+# Runs on a version tag (v1.2.3), which the release workflow of marktmentor-sdk
+# pushes. Needs the secret NUGET_API_KEY in the environment nuget.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # Only v* tags may use this environment. After the repository is public, add
+    # yourself as required reviewer in Settings → Environments → nuget.
+    environment: nuget
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+      - run: dotnet test MarktMentor.slnx -c Release
+      - run: dotnet pack src/MarktMentor/MarktMentor.csproj -c Release -p:Version=${GITHUB_REF_NAME#v} -o out
+      - run: dotnet nuget push "out/*.nupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
