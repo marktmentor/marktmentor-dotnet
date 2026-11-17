@@ -8,6 +8,18 @@ bol product research and your own store data. Targets .NET 8, .NET Framework
 dotnet add package MarktMentor
 ```
 
+Try it without an account with the public test key `mm_test_demo`: it answers
+every endpoint with fixed example data (product `9300000138905032`, niche
+`6797`), free. See <https://api.marktmentor.nl/guides/test-key>.
+
+```csharp
+using MarktMentor;
+
+var demo = new MarktMentorClient("mm_test_demo");
+var product = await demo.Products.GetAsync(new GetProductsRequest { ProductCode = "9300000138905032" });
+Console.WriteLine(product.Data.Title);
+```
+
 ```csharp
 using MarktMentor;
 
