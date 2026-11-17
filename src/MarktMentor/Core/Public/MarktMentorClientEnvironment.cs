@@ -3,5 +3,5 @@ namespace MarktMentor;
 [Serializable]
 public class MarktMentorClientEnvironment
 {
-    public const string Default = "https://api.marktmentor.nl";
+    public const string Production = "https://api.marktmentor.nl";
 }

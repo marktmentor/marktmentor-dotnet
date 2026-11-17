@@ -1,287 +1,42 @@
-# Marktmentor C# Library
+# MarktMentor
 
-[![fern shield](https://img.shields.io/badge/%F0%9F%8C%BF-Built%20with%20Fern-brightgreen)](https://buildwithfern.com?utm_source=github&utm_medium=github&utm_campaign=readme&utm_source=Marktmentor%2FC%23)
-[![nuget shield](https://img.shields.io/nuget/v/MarktMentor)](https://nuget.org/packages/MarktMentor)
-
-The Marktmentor C# library provides convenient access to the Marktmentor APIs from C#.
-
-## Table of Contents
-
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Reference](#reference)
-- [Usage](#usage)
-- [Environments](#environments)
-- [Exception Handling](#exception-handling)
-- [Pagination](#pagination)
-- [Advanced](#advanced)
-  - [Retries](#retries)
-  - [Timeouts](#timeouts)
-  - [Raw Response](#raw-response)
-  - [Additional Headers](#additional-headers)
-  - [Additional Query Parameters](#additional-query-parameters)
-  - [Additional Body Properties](#additional-body-properties)
-  - [Forward Compatible Enums](#forward-compatible-enums)
-- [Contributing](#contributing)
-
-## Requirements
-
-This SDK requires:
-- .NET 8 and above
-- .NET Framework 4.6.2 and above
-- .NET Standard 2.0 and above
-
-## Installation
+Official C# SDK for the [MarktMentor Public API](https://api.marktmentor.nl):
+bol product research and your own store data. Targets .NET 8, .NET Framework
+4.6.2 and .NET Standard 2.0.
 
 ```sh
 dotnet add package MarktMentor
 ```
 
-## Reference
-
-A full reference for this library is available [here](./reference.md).
-
-## Usage
-
-Instantiate and use the client with the following:
-
 ```csharp
 using MarktMentor;
 
-var client = new MarktMentorClient("TOKEN");
-var items = await client.Products.ListAsync(
-    new ListProductsRequest
+var client = new MarktMentorClient(Environment.GetEnvironmentVariable("MARKTMENTOR_API_KEY"));
+
+try
+{
+    var products = await client.Products.ListAsync(new ListProductsRequest { Search = "drinkfles" });
+    await foreach (var product in products) // all pages
     {
-        Brand = "Kambukka",
-        Ean = "5407005143414",
-        Search = "drinkfles",
+        Console.WriteLine($"{product.ProductCode} {product.Title}");
     }
-);
-
-await foreach (var item in items)
-{
-    // do something with item
-}
-```
-
-## Environments
-
-This SDK allows you to configure different environments for API requests.
-
-```csharp
-using MarktMentor;
-
-var client = new MarktMentorClient(clientOptions: new ClientOptions
-{
-    BaseUrl = MarktMentorClientEnvironment.Default
-});
-```
-
-## Exception Handling
-
-When the API returns a non-success status code (4xx or 5xx response), a subclass of the following error
-will be thrown.
-
-```csharp
-using MarktMentor;
-
-try {
-    var response = await client.Products.ListAsync(...);
-} catch (MarktMentorClientApiException e) {
-    System.Console.WriteLine(e.Body);
-    System.Console.WriteLine(e.StatusCode);
-
-    // Access the raw HTTP response (status code, URL, headers) off the exception
-    var rawResponse = e.RawResponse;
-    if (rawResponse != null)
-    {
-        System.Console.WriteLine(rawResponse.Url);
-        if (rawResponse.Headers.TryGetValue("X-Request-Id", out var requestId))
+    var history = await client.Products.SalesHistoryAsync(
+        new SalesHistoryProductsRequest
         {
-            System.Console.WriteLine($"Request ID: {requestId}");
+            ProductCode = "ean:8712345678901",
+            Period = SalesHistoryProductsRequestPeriod.OneY,
+            Interval = SalesHistoryProductsRequestInterval.Month,
         }
-    }
+    );
 }
-```
-
-## Pagination
-
-List endpoints are paginated. The SDK provides an async enumerable so that you can simply loop over the items:
-
-```csharp
-using MarktMentor;
-
-var client = new MarktMentorClient("TOKEN");
-var items = await client.Products.ListAsync(
-    new ListProductsRequest
-    {
-        Brand = "Kambukka",
-        Ean = "5407005143414",
-        Search = "drinkfles",
-    }
-);
-
-await foreach (var item in items)
+catch (PaymentRequiredError error)
 {
-    // do something with item
+    Console.WriteLine($"Allowance used up: {error.Body.Code}");
 }
 ```
 
-## Advanced
-
-### Retries
-
-The SDK is instrumented with automatic retries with exponential backoff. A request will be retried as long
-as the request is deemed retryable and the number of retry attempts has not grown larger than the configured
-retry limit (default: 2).
-
-A request is deemed retryable when any of the following HTTP status codes is returned:
-- [408](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/408) (Timeout)
-- [429](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/429) (Too Many Requests)
-- [5XX](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status#server_error_responses) (All server errors, including 500)
-
-Use the `MaxRetries` request option to configure this behavior.
-
-```csharp
-var response = await client.Products.ListAsync(
-    ...,
-    new RequestOptions {
-        MaxRetries = 0 // Override MaxRetries at the request level
-    }
-);
-```
-
-### Timeouts
-
-The SDK defaults to a 30 second timeout. Use the `Timeout` option to configure this behavior.
-
-```csharp
-var response = await client.Products.ListAsync(
-    ...,
-    new RequestOptions {
-        Timeout = TimeSpan.FromSeconds(3) // Override timeout to 3s
-    }
-);
-```
-
-### Raw Response
-
-Access raw HTTP response data (status code, headers, URL) alongside parsed response data using the `.WithRawResponse()` method.
-
-```csharp
-using MarktMentor;
-
-// Access raw response data (status code, headers, etc.) alongside the parsed response
-var result = await client.Products.ListAsync(...).WithRawResponse();
-
-// Access the parsed data
-var data = result.Data;
-
-// Access raw response metadata
-var statusCode = result.RawResponse.StatusCode;
-var headers = result.RawResponse.Headers;
-var url = result.RawResponse.Url;
-
-// Access specific headers (case-insensitive)
-if (headers.TryGetValue("X-Request-Id", out var requestId))
-{
-    System.Console.WriteLine($"Request ID: {requestId}");
-}
-
-// For the default behavior, simply await without .WithRawResponse()
-var parsedData = await client.Products.ListAsync(...);
-
-// .WithRawResponse() also works on streaming endpoints (returns IAsyncEnumerable<T> + RawResponse)
-// and on endpoints with no response body (returns RawResponse only).
-```
-
-### Additional Headers
-
-If you would like to send additional headers as part of the request, use the `AdditionalHeaders` request option.
-
-```csharp
-var response = await client.Products.ListAsync(
-    ...,
-    new RequestOptions {
-        AdditionalHeaders = new Dictionary<string, string?>
-        {
-            { "X-Custom-Header", "custom-value" }
-        }
-    }
-);
-```
-
-### Additional Query Parameters
-
-If you would like to send additional query parameters as part of the request, use the `AdditionalQueryParameters` request option.
-
-```csharp
-var response = await client.Products.ListAsync(
-    ...,
-    new RequestOptions {
-        AdditionalQueryParameters = new Dictionary<string, string>
-        {
-            { "custom_param", "custom-value" }
-        }
-    }
-);
-```
-
-### Additional Body Properties
-
-If you would like to send additional body properties as part of the request, use the `AdditionalBodyProperties` request option.
-These properties are merged into the serialized JSON body using their wire-format names; on a key collision the additional
-property wins, and nested objects are merged recursively. If the endpoint has no request body, the additional properties
-are sent as the JSON body. Form-urlencoded requests merge the additional properties the same way before encoding;
-multipart (file upload) requests are not supported.
-
-```csharp
-var response = await client.Products.ListAsync(
-    ...,
-    new RequestOptions {
-        AdditionalBodyProperties = new Dictionary<string, object>
-        {
-            { "custom_field", "custom-value" }
-        }
-    }
-);
-```
-
-### Forward Compatible Enums
-
-This SDK uses forward-compatible enums that can handle unknown values gracefully.
-
-```csharp
-using MarktMentor;
-
-// Using a built-in value
-var listProductsRequestMarket = ListProductsRequestMarket.Nl;
-
-// Using a custom value
-var customListProductsRequestMarket = ListProductsRequestMarket.FromCustom("custom-value");
-
-// Using in a switch statement
-switch (listProductsRequestMarket.Value)
-{
-    case ListProductsRequestMarket.Values.Nl:
-        Console.WriteLine("Nl");
-        break;
-    default:
-        Console.WriteLine($"Unknown value: {listProductsRequestMarket.Value}");
-        break;
-}
-
-// Explicit casting
-string listProductsRequestMarketString = (string)ListProductsRequestMarket.Nl;
-ListProductsRequestMarket listProductsRequestMarketFromString = (ListProductsRequestMarket)"NL";
-```
-
-## Contributing
-
-While we value open-source contributions to this SDK, this library is generated programmatically.
-Additions made directly to this library would have to be moved over to our generation code,
-otherwise they would be overwritten upon the next generated release. Feel free to open a PR as
-a proof of concept, but know that we will not be able to merge it as-is. We suggest opening
-an issue first to discuss with us!
-
-On the other hand, contributions to the README are always very welcome!
+Spending is limited by your account setting, not by the SDK: extra usage above
+the bundle is off by default, and the organization owner sets a monthly maximum
+in the dashboard. A used-up allowance throws `PaymentRequiredError`;
+`error.Body.Code` is `BundleExhausted`, `OverageLimitReached` or
+`FreeQuotaExhausted`. The generated reference is in `reference.md`.
