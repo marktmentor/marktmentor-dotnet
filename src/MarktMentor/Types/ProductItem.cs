@@ -32,6 +32,9 @@ public record ProductItem : IJsonOnDeserialized
     [JsonPropertyName("imageUrl")]
     public string? ImageUrl { get; set; }
 
+    /// <summary>
+    /// The first day MarktMentor saw the product on bol. For a product that came on bol after MarktMentor started to follow its category, this is about its launch date. An older product can be on bol for longer.
+    /// </summary>
     [JsonPropertyName("availableSince")]
     public DateOnly? AvailableSince { get; set; }
 
